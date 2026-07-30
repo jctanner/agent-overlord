@@ -1,0 +1,45 @@
+# Local configuration and secrets
+config.yaml
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage*
+htmlcov/
+dist/
+build/
+
+# Runtime state
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
+*.pid
+
+# Web frontend
+node_modules/
+web/dist/
+*.tsbuildinfo
+web/vite.config.js
+web/vite.config.d.ts
+
+# Local reference repositories
+repos/cosim/
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db

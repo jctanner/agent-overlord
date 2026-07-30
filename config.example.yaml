@@ -1,0 +1,65 @@
+hosts:
+  - name: laptop
+    local: true
+  - name: work-host
+    ssh: user@example.internal
+    # port: 22
+    # key: /path/to/private/key
+    # tmux_socket: default
+
+poll_interval_secs: 2
+stalled_after_secs: 900
+capture_lines: 80
+disappearance_confirmations: 3
+worker_analysis_cooldown_secs: 900
+
+# Persistent semantic council. Controller containers receive only the scoped
+# Agent Overlord MCP tools; they never receive tmux sockets or host SSH keys.
+controllers:
+  - controller_id: operator
+    role: operator
+    harness: claude.vertex
+    model: sonnet
+    environment:
+      CLAUDE_CODE_USE_VERTEX: "1"
+      CLOUD_ML_REGION: global
+      ANTHROPIC_VERTEX_PROJECT_ID: your-gcp-project
+  - controller_id: auditor
+    role: auditor
+    harness: codex
+    # "default" lets the authenticated Codex account select its supported model.
+    model: default
+  - controller_id: strategist
+    role: strategist
+    harness: claude.vertex
+    model: opus
+    environment:
+      CLAUDE_CODE_USE_VERTEX: "1"
+      CLOUD_ML_REGION: global
+      ANTHROPIC_VERTEX_PROJECT_ID: your-gcp-project
+
+controller_runtime_enabled: false
+controller_image: localhost/agent-overlord-controller:latest
+controller_mcp_url: http://127.0.0.1:8001
+fast_reviewer_controller_id: auditor
+fast_review_timeout_secs: 60
+
+# Safe action defaults. These seed SQLite only on first startup; the approval
+# center owns subsequent changes.
+automation:
+  automation_enabled: false
+  dry_run: true
+  paused: false
+  auto_yes_workers: []
+  prompt_expiration_secs: 120
+  verification_timeout_secs: 8
+  max_actions_per_pane_per_hour: 20
+  auto_yes_max_actions_per_worker_per_hour: 100
+  review_precedent_ttl_secs: 604800
+
+attention_patterns:
+  - Do you want to
+  - Allow
+  - yes/no
+  - Permission
+  - Press enter
