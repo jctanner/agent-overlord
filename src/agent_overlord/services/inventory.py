@@ -172,22 +172,17 @@ class InventoryService:
             await self._mark_host_disconnected(host)
 
         successful_hosts = set(observations_by_host)
+        disappeared: list[Worker] = []
         for worker in self.workers.values():
             if (
                 worker.observation.host in successful_hosts
                 and worker.worker_id not in seen
-                and worker.state != WorkerState.DISCONNECTED
             ):
                 misses = self._missing_counts.get(worker.worker_id, 0) + 1
                 self._missing_counts[worker.worker_id] = misses
                 if misses < self.config.disappearance_confirmations:
                     continue
-                worker.state = WorkerState.DISCONNECTED
-                worker.evidence = [
-                    "Pane was absent from "
-                    f"{misses} consecutive successful inventory snapshots"
-                ]
-                await self.store.upsert_worker(worker)
+                disappeared.append(worker)
                 await self.emit(
                     WallEvent(
                         actor="observer",
@@ -197,6 +192,11 @@ class InventoryService:
                         message=f"Pane disappeared: {worker.observation.display_name}",
                     )
                 )
+
+        for worker in disappeared:
+            self.workers.pop(worker.worker_id, None)
+            self._missing_counts.pop(worker.worker_id, None)
+        await self.store.delete_workers([worker.worker_id for worker in disappeared])
 
         ordered = self._ordered_workers()
         await asyncio.gather(*(listener(ordered) for listener in self._worker_listeners))

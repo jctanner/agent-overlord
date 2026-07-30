@@ -136,7 +136,7 @@ async def test_restore_all_ignored_sessions_reconciles_inventory_immediately(
     assert await store.list_ignored_sessions() == []
 
 
-async def test_single_partial_snapshot_does_not_disconnect_worker(
+async def test_confirmed_missing_worker_is_pruned_from_inventory_and_storage(
     tmp_path: Path, config, codex_observation
 ) -> None:
     store = SQLiteStore(tmp_path / "partial.db")
@@ -154,6 +154,38 @@ async def test_single_partial_snapshot_does_not_disconnect_worker(
     inventory.discovery.discover_all = missing
     assert (await inventory.refresh())[0].state != "disconnected"
     assert (await inventory.refresh())[0].state != "disconnected"
-    assert (await inventory.refresh())[0].state == "disconnected"
+    assert await inventory.refresh() == []
+    assert await store.list_workers() == []
     events = await store.list_events()
     assert sum(event.kind == EventKind.DISCONNECTED for event in events) == 1
+
+
+async def test_persisted_disconnected_worker_is_pruned_when_host_is_reachable(
+    tmp_path: Path, config, codex_observation
+) -> None:
+    store = SQLiteStore(tmp_path / "persisted-stale.db")
+    await store.initialize()
+    inventory = InventoryService(config, store)
+
+    async def present():
+        return {"local": [codex_observation]}, {}
+
+    async def host_failure():
+        return {}, {"local": "connection failed"}
+
+    inventory.discovery.discover_all = present
+    await inventory.refresh()
+    inventory.discovery.discover_all = host_failure
+    assert (await inventory.refresh())[0].state == "disconnected"
+
+    restarted = InventoryService(config, store)
+    await restarted.initialize()
+
+    async def missing():
+        return {"local": []}, {}
+
+    restarted.discovery.discover_all = missing
+    assert len(await restarted.refresh()) == 1
+    assert len(await restarted.refresh()) == 1
+    assert await restarted.refresh() == []
+    assert await store.list_workers() == []
